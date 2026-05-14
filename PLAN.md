@@ -31,7 +31,7 @@ For each scanned page (in 0-indexed scan order `i`, with `S` scans and `N = 2·S
 
 ### Settings
 
-- **Also generate text (OCR)** — placeholder toggle, off by default. Future work will run OCR over each cropped half and add a hidden, searchable text layer to the output PDF.
+- **Also generate text (OCR)** — *off by default*. When enabled, each cropped half is run through [Tesseract.js](https://github.com/naptha/tesseract.js) (loaded lazily on first use) before being JPEG-encoded. The recognised words and their bounding boxes are overlaid on the output PDF page as **invisible text** (PDF text rendering-mode 3) so the result is searchable and selectable while visually identical to the non-OCR output. OCR language is auto-picked from the detected app language (sv→swe, de→deu, es→spa, fr→fra, default eng).
 - Rendering DPI is fixed at 600 and the output is JPEG; this matches typical scanner native resolution and produces sharp, manageable files.
 
 ---

@@ -44,7 +44,7 @@ Progress is reported live in the Split tab as a progress bar with “Generating 
 - ⬇️ Download the result
 - 💾 Last uploaded PDF is remembered locally (IndexedDB, up to 100 MB)
 - 🌍 i18n with auto-detection — English, Svenska, Deutsch, Español, Français
-- ⚙️ Settings: **Also generate text (OCR)** toggle (placeholder, not yet implemented)
+- ⚙️ Settings: **Also generate text (OCR)** — adds a searchable invisible text layer via Tesseract.js
 - 📱 Designed for iPad in portrait, also great on phones and laptops
 - 🫧 macOS-style liquid-glass UI with large, accessible touch targets
 
@@ -52,7 +52,8 @@ Progress is reported live in the Split tab as a progress bar with “Generating 
 
 - [Vite](https://vitejs.dev/) + TypeScript
 - [pdf.js](https://mozilla.github.io/pdf.js/) renders previews and rasterizes each half at 600 dpi
-- [pdf-lib](https://pdf-lib.js.org/) builds the output PDF by embedding the JPEG halves onto A4 portrait pages
+- [pdf-lib](https://pdf-lib.js.org/) builds the output PDF: embeds the JPEG halves onto A4 portrait pages and overlays invisible OCR text
+- [Tesseract.js](https://github.com/naptha/tesseract.js) (loaded lazily) provides the optional OCR pass
 - [idb-keyval](https://github.com/jakearchibald/idb-keyval) for IndexedDB persistence
 - No UI framework — plain HTML, CSS, and TS
 
@@ -94,7 +95,7 @@ Everything is modular so new features (drag-and-drop, manual reordering, OCR, PW
 
 ## Settings
 
-- **Also generate text (OCR)** *(off by default, placeholder — not implemented yet)*: when enabled, a future version will add a searchable text layer to the output PDF via OCR.
+- **Also generate text (OCR)** *(off by default)*: when enabled, every cropped half is run through [Tesseract.js](https://github.com/naptha/tesseract.js) before being JPEG-encoded. The recognised words are added to the output PDF as **invisible text** (PDF text rendering-mode 3) positioned to match each word's bounding box, so the result is **searchable and selectable** while looking visually identical to the non-OCR output. The OCR language is picked from the detected app language (`sv→swe`, `de→deu`, `es→spa`, `fr→fra`, default `eng`). Tesseract.js and the language data are downloaded lazily on first use.
 
 Rendering is fixed at **600 dpi** and the output is JPEG-encoded — high enough to be visually indistinguishable from a clean scan, while keeping file sizes manageable.
 
