@@ -26,31 +26,33 @@ PDFSplit converts this into a new PDF where:
 
 For each scanned page:
 
-1. The scan is rendered through pdf.js, which produces an upright image regardless of any rotation or quirks in the source PDF. **No rotation logic is applied** — orientation is whatever pdf.js produces.
-2. The rendered image is **cut vertically down the middle** into two equal halves — one A5 page each.
-3. Each half is encoded as **PNG** (lossless) or **JPEG** (smaller files) per settings.
-4. Halves are **reordered** from booklet imposition into linear reading order using:
+1. The scan is rendered through **pdf.js** at **600 dpi**, which produces an upright image regardless of any rotation or quirks in the source PDF. **No rotation logic is applied** — orientation is whatever pdf.js produces.
+2. Each visual half is rendered **directly into its own half-sized canvas** (via a viewport translation transform) so that we never allocate a full-page 600-dpi canvas — important on iPadOS / iOS where there is a hard per-canvas pixel-count limit.
+3. Each half is encoded as **JPEG** and the canvas is freed before the next half is processed.
+4. Halves are **reordered** from booklet imposition into linear reading order:
    - even scan i (outer side):  visual-left → page N−i,  visual-right → page i+1
    - odd  scan i (inner side):  visual-left → page i+1,  visual-right → page N−i
 5. Each half is placed on a fresh **A4 portrait** output page, scaled to fill while preserving aspect ratio.
 
+Progress is reported live in the Split tab as a progress bar with “Generating page X of Y”.
+
 ## Features
 
 - 📄 Upload a PDF, see all pages previewed
-- ✂️ One-tap split into the correctly-ordered portrait PDF
-- 🔁 Tab between **Original** and **Converted**
+- ✂️ One-tap split into the correctly-ordered A4-portrait PDF, with a live progress bar
+- 🔁 Tab between **Original** and **Split**
 - ⬇️ Download the result
 - 💾 Last uploaded PDF is remembered locally (IndexedDB, up to 100 MB)
 - 🌍 i18n with auto-detection — English, Svenska, Deutsch, Español, Français
-- ⚙️ Settings: lossless (default, preserves quality) or rasterized output at chosen DPI
+- ⚙️ Settings: **Also generate text (OCR)** toggle (placeholder, not yet implemented)
 - 📱 Designed for iPad in portrait, also great on phones and laptops
-- 🫧 Liquid-glass UI with large, accessible touch targets
+- 🫧 macOS-style liquid-glass UI with large, accessible touch targets
 
 ## Tech
 
 - [Vite](https://vitejs.dev/) + TypeScript
-- [pdf.js](https://mozilla.github.io/pdf.js/) for previews and rasterization
-- [pdf-lib](https://pdf-lib.js.org/) for the lossless page-cropping output
+- [pdf.js](https://mozilla.github.io/pdf.js/) renders previews and rasterizes each half at 600 dpi
+- [pdf-lib](https://pdf-lib.js.org/) builds the output PDF by embedding the JPEG halves onto A4 portrait pages
 - [idb-keyval](https://github.com/jakearchibald/idb-keyval) for IndexedDB persistence
 - No UI framework — plain HTML, CSS, and TS
 
@@ -92,9 +94,9 @@ Everything is modular so new features (drag-and-drop, manual reordering, OCR, PW
 
 ## Settings
 
-- **Lossless PNG** (default): each cropped half is encoded as PNG. No image-codec loss; bigger files.
-- **JPEG**: smaller files; visually identical at high quality.
-- **Rendering DPI** (72–600, default 300): controls how sharp the cropped pages are. 300 dpi matches typical scanners.
+- **Also generate text (OCR)** *(off by default, placeholder — not implemented yet)*: when enabled, a future version will add a searchable text layer to the output PDF via OCR.
+
+Rendering is fixed at **600 dpi** and the output is JPEG-encoded — high enough to be visually indistinguishable from a clean scan, while keeping file sizes manageable.
 
 ## Notes
 

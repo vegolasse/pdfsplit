@@ -21,13 +21,18 @@ Output: a PDF with `N` **A4 portrait** pages in correct linear reading order —
 
 For each scanned page (in 0-indexed scan order `i`, with `S` scans and `N = 2·S` magazine pages):
 
-1. **Render** the scan via pdf.js to a canvas. pdf.js produces an upright image regardless of any rotation or scanner quirks in the source PDF — **no rotation logic is applied** in our code.
-2. **Cut** the canvas vertically down the middle into visual-left and visual-right halves (one A5 page each).
-3. **Encode** each half as PNG (lossless) or JPEG (smaller files) according to settings.
+1. **Render** the scan via pdf.js at a **fixed 600 dpi**. pdf.js produces an upright image regardless of any rotation or scanner quirks in the source PDF — **no rotation logic is applied** in our code.
+2. **Render each visual half separately** into a half-sized canvas via a viewport translation transform. This keeps each canvas under iPadOS/iOS per-canvas pixel limits and bounds peak memory.
+3. **Encode** each half as JPEG, then free the canvas before continuing to the next half. A progress callback fires after every half: the Split tab shows a progress bar with “Generating page X of Y”.
 4. **Reorder** halves into linear reading order using booklet imposition:
    - even scan i (outer): visual-left → page `N−i`,  visual-right → page `i+1`
    - odd  scan i (inner): visual-left → page `i+1`,  visual-right → page `N−i`
-5. **Place** each half on a fresh **A4 portrait** output page, scaled to fill while preserving aspect ratio.
+5. **Place** each half on a fresh **A4 portrait** output page (via pdf-lib), scaled to fill while preserving aspect ratio.
+
+### Settings
+
+- **Also generate text (OCR)** — placeholder toggle, off by default. Future work will run OCR over each cropped half and add a hidden, searchable text layer to the output PDF.
+- Rendering DPI is fixed at 600 and the output is JPEG; this matches typical scanner native resolution and produces sharp, manageable files.
 
 ---
 

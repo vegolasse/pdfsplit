@@ -4,4 +4,4 @@ dist
 *.log
 .vite
 public/pdf.worker.min.mjs
-
+.idea

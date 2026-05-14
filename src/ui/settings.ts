@@ -1,35 +1,19 @@
 import { h } from '../app/dom';
-import { store, DEFAULT_SETTINGS, type Settings } from '../app/state';
+import { store, type Settings } from '../app/state';
 import { saveSettings } from '../app/storage';
 import { t, applyI18n } from '../i18n';
 
 export function openSettingsModal(): void {
   const cur: Settings = { ...store.get().settings };
 
-  const fidelitySelect = h('select', {
-    class: 'lang-select',
+  const generateTextToggle = h('input', {
+    type: 'checkbox',
+    checked: cur.generateText,
+    style: { width: '22px', height: '22px', cursor: 'pointer' },
     onchange: (e: Event) => {
-      cur.fidelity = (e.target as HTMLSelectElement).value as Settings['fidelity'];
+      cur.generateText = (e.target as HTMLInputElement).checked;
     },
-  },
-    h('option', { value: 'lossless', selected: cur.fidelity === 'lossless', 'data-i18n': 'settings.fidelity.lossless' }, t('settings.fidelity.lossless')),
-    h('option', { value: 'raster', selected: cur.fidelity === 'raster', 'data-i18n': 'settings.fidelity.raster' }, t('settings.fidelity.raster')),
-  );
-
-  const dpiInput = h('input', {
-    type: 'number', min: '72', max: '600', step: '1', value: String(cur.dpi),
-    class: 'lang-select', style: { paddingRight: '16px' },
-    onchange: (e: Event) => {
-      const v = parseInt((e.target as HTMLInputElement).value, 10);
-      cur.dpi = Number.isFinite(v) ? Math.min(600, Math.max(72, v)) : DEFAULT_SETTINGS.dpi;
-    },
-  });
-
-  const dpiRow = h('div', { class: 'row' },
-    h('label', { 'data-i18n': 'settings.dpi' }, t('settings.dpi')),
-    dpiInput,
-    h('div', { class: 'hint', 'data-i18n': 'settings.dpiHint' }, t('settings.dpiHint')),
-  );
+  }) as HTMLInputElement;
 
   const closeBtn = h('button', {
     class: 'btn btn-primary',
@@ -41,13 +25,15 @@ export function openSettingsModal(): void {
     },
   }, t('settings.close'));
 
-  const modal = h('div', { class: 'glass modal', role: 'dialog', 'aria-modal': 'true' },
+  const modal = h('div', { class: 'modal', role: 'dialog', 'aria-modal': 'true' },
     h('h2', { 'data-i18n': 'settings.title' }, t('settings.title')),
     h('div', { class: 'row' },
-      h('label', { 'data-i18n': 'settings.fidelity' }, t('settings.fidelity')),
-      fidelitySelect,
+      h('label', { style: { display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' } },
+        generateTextToggle,
+        h('span', { 'data-i18n': 'settings.generateText' }, t('settings.generateText')),
+      ),
+      h('div', { class: 'hint', 'data-i18n': 'settings.generateText.hint' }, t('settings.generateText.hint')),
     ),
-    dpiRow,
     h('div', { class: 'modal-actions' }, closeBtn),
   );
 

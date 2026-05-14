@@ -25,9 +25,14 @@ export class Store<T extends object> {
 export type View = 'original' | 'converted';
 
 export type Settings = {
-  fidelity: 'lossless' | 'raster';
-  dpi: number;
+  /** If true, future OCR pass will add a hidden text layer. Not implemented yet. */
+  generateText: boolean;
 };
+
+export type SplitProgress = {
+  done: number;
+  total: number;
+} | null;
 
 export type AppState = {
   fileName: string | null;
@@ -35,9 +40,10 @@ export type AppState = {
   convertedBytes: Uint8Array | null;
   view: View;
   settings: Settings;
+  splitProgress: SplitProgress;
 };
 
-export const DEFAULT_SETTINGS: Settings = { fidelity: 'lossless', dpi: 300 };
+export const DEFAULT_SETTINGS: Settings = { generateText: false };
 
 export const store = new Store<AppState>({
   fileName: null,
@@ -45,5 +51,6 @@ export const store = new Store<AppState>({
   convertedBytes: null,
   view: 'original',
   settings: { ...DEFAULT_SETTINGS },
+  splitProgress: null,
 });
 
