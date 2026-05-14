@@ -22,7 +22,7 @@ export class Store<T extends object> {
   }
 }
 
-export type View = 'original' | 'converted';
+export type View = 'original' | 'converted' | 'help';
 
 export type Settings = {
   /** If true, future OCR pass will add a hidden text layer. Not implemented yet. */
@@ -43,13 +43,13 @@ export type AppState = {
   splitProgress: SplitProgress;
 };
 
-export const DEFAULT_SETTINGS: Settings = { generateText: false };
+export const DEFAULT_SETTINGS: Settings = { generateText: true };
 
 export const store = new Store<AppState>({
   fileName: null,
   originalBytes: null,
   convertedBytes: null,
-  view: 'original',
+  view: 'help',
   settings: { ...DEFAULT_SETTINGS },
   splitProgress: null,
 });

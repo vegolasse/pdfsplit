@@ -1,10 +1,9 @@
 import { h, downloadBlob } from '../app/dom';
 import { store } from '../app/state';
-import { clearPdf, savePdf, MAX_STORED_BYTES } from '../app/storage';
+import { clearPdf, savePdf, saveSettings, MAX_STORED_BYTES } from '../app/storage';
 import { splitMagazinePdf } from '../pdf/split';
 import { t } from '../i18n';
 import { toast } from './toast';
-import { openSettingsModal } from './settings';
 
 /**
  * The toolbar is the row of contextual actions below the tabs:
@@ -19,9 +18,10 @@ export function buildToolbar(): HTMLElement {
     root.innerHTML = '';
     if (s.view === 'original') {
       root.append(uploadButton(), fileChip());
-    } else {
-      root.append(downloadButton(), settingsButton());
+    } else if (s.view === 'converted') {
+      root.append(downloadButton(), ocrToggle());
     }
+    // Help view: no toolbar items.
   };
 
   store.subscribe(render);
@@ -88,14 +88,35 @@ function downloadButton(): HTMLElement {
   }, t('header.download'));
 }
 
-function settingsButton(): HTMLElement {
-  return h('button', {
-    class: 'btn btn-icon btn-symbol',
-    type: 'button',
-    'aria-label': t('header.settings'),
-    title: t('header.settings'),
-    onclick: () => openSettingsModal(),
-  }, '⚙︎');
+/**
+ * macOS-style toggle for the "Also generate text (OCR)" setting.
+ * - Persists to IndexedDB on change.
+ * - If a converted PDF already exists, clears it and re-runs the split so
+ *   the new setting takes effect immediately.
+ */
+function ocrToggle(): HTMLElement {
+  const s = store.get();
+  const splitting = !!s.splitProgress;
+  const input = h('input', {
+    type: 'checkbox',
+    checked: s.settings.generateText,
+    disabled: splitting,
+    'aria-label': t('settings.generateText'),
+    onchange: async (e: Event) => {
+      const next = (e.target as HTMLInputElement).checked;
+      const settings = { ...store.get().settings, generateText: next };
+      // Throw away the cached split so the new setting takes effect.
+      store.set({ settings, convertedBytes: null, splitProgress: null });
+      void saveSettings(settings);
+      void runSplitIfNeeded();
+    },
+  }) as HTMLInputElement;
+
+  return h('label', { class: splitting ? 'toggle toggle--disabled' : 'toggle' },
+    input,
+    h('span', { class: 'toggle-track' }, h('span', { class: 'toggle-knob' })),
+    h('span', { class: 'toggle-label', 'data-i18n': 'settings.generateText' }, t('settings.generateText')),
+  );
 }
 
 // ---------- File ingestion --------------------------------------------------

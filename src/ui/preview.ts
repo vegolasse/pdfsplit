@@ -4,6 +4,7 @@ import { loadPdf, type PDFDocumentProxy } from '../pdf/loader';
 import { renderPageToCanvas } from '../pdf/renderer';
 import { t } from '../i18n';
 import { toast } from './toast';
+import { buildHelp } from './help';
 
 /**
  * Preview area. Renders the current PDF's pages **progressively**: each page
@@ -59,6 +60,14 @@ export function buildPreview(): HTMLElement {
 
     const s = store.get();
     const which = s.view;
+
+    // Help tab: static content, no PDF involved.
+    if (which === 'help') {
+      clearProgress();
+      root.innerHTML = '';
+      root.appendChild(buildHelp());
+      return;
+    }
 
     // If we're on the Split tab and a split is running, show the progress
     // bar and bail — we'll be re-invoked when splitProgress changes.

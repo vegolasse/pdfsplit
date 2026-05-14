@@ -30,9 +30,10 @@ const LANG_MAP: Record<string, string> = {
   fr: 'fra',
 };
 
+type RecognizeImage = HTMLCanvasElement | Blob | ImageData | string;
 type AnyWorker = {
   recognize(
-    image: HTMLCanvasElement,
+    image: RecognizeImage,
     options?: Record<string, unknown>,
     output?: Record<string, unknown>,
   ): Promise<{ data: unknown }>;
@@ -51,23 +52,70 @@ export class Ocr {
   async start(): Promise<void> {
     if (this.workerP) return;
     this.workerP = (async () => {
+      log('importing tesseract.js…');
+      const t0 = performance.now();
       const ts: typeof import('tesseract.js') = await import('tesseract.js');
-      // tesseract.js v5+ / v6+: createWorker(lang) auto-loads core + langdata.
-      const worker = await ts.createWorker(this.lang);
+      log(`tesseract.js imported in ${(performance.now() - t0).toFixed(0)}ms`);
+      // tesseract.js v6+ / v7+: createWorker(lang, oem, options).
+      //   - oem = 1 → LSTM-only, smaller model + faster recognition than the
+      //              default LSTM+legacy combo.
+      //   - langPath → "fast" trained-data, optimised for speed over accuracy.
+      //                Matches the LSTM-only OEM.
+      // Both choices follow the official Tesseract.js performance guide.
+      log(`creating worker (lang=${this.lang}, oem=1, fast langPath)…`);
+      const t1 = performance.now();
+      const worker = await ts.createWorker(this.lang, 1, {
+        langPath: 'https://tessdata.projectnaptha.com/4.0.0_fast',
+        logger: (m: unknown) => log('tess', m),
+        errorHandler: (e: unknown) => log('tess ERROR', e),
+      } as Record<string, unknown>);
+      log(`worker ready in ${(performance.now() - t1).toFixed(0)}ms`);
       return worker as unknown as AnyWorker;
     })();
-    await this.workerP;
+    try {
+      await this.workerP;
+    } catch (e) {
+      log('worker start FAILED', e);
+      this.workerP = null;
+      throw e;
+    }
   }
 
   /**
    * Run OCR on an off-screen canvas. Returns one entry per recognized word.
    * Empty or zero-area boxes are filtered out.
+   *
+   * Safari note: passing an `HTMLCanvasElement` directly into tesseract.js
+   * v6/v7 goes through an `OffscreenCanvas` / `transferToImageBitmap` path
+   * that misbehaves in Safari (produces a blank/empty result silently). We
+   * convert the canvas to a PNG `Blob` first, which works reliably in all
+   * browsers.
    */
   async recognizeWords(canvas: HTMLCanvasElement): Promise<WordBox[]> {
     if (!this.workerP) await this.start();
     const worker = await this.workerP!;
-    const res = await worker.recognize(canvas, undefined, { blocks: true });
-    return flattenWords(res.data);
+    log(`encoding ${canvas.width}×${canvas.height} canvas to PNG…`);
+    const tBlob = performance.now();
+    const blob: Blob = await new Promise((res, rej) =>
+      canvas.toBlob(
+        (b) => (b ? res(b) : rej(new Error('canvas.toBlob returned null'))),
+        'image/png',
+      ),
+    );
+    log(`PNG blob: ${blob.size} bytes, type=${blob.type}, encoded in ${(performance.now() - tBlob).toFixed(0)}ms`);
+    const tRec = performance.now();
+    let res: { data: unknown };
+    try {
+      res = await worker.recognize(blob, undefined, { blocks: true });
+    } catch (e) {
+      log('worker.recognize THREW', e);
+      throw e;
+    }
+    log(`recognize() resolved in ${(performance.now() - tRec).toFixed(0)}ms`);
+    summarizeRecognizeData(res.data);
+    const words = flattenWords(res.data);
+    log(`flattened to ${words.length} word boxes`);
+    return words;
   }
 
   async stop(): Promise<void> {
@@ -78,6 +126,41 @@ export class Ocr {
 }
 
 // --- Helpers ---------------------------------------------------------------
+
+/**
+ * Debug logger. Enabled by default; turn off with
+ * `localStorage.pdfsplitOcrDebug = '0'`. Each line is prefixed so it's easy
+ * to grep for in the browser console.
+ */
+function log(...args: unknown[]): void {
+  try {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('pdfsplitOcrDebug') === '0') return;
+  } catch { /* ignore */ }
+  // eslint-disable-next-line no-console
+  console.log('[ocr]', ...args);
+}
+
+/**
+ * Print a structural summary of the data object returned by
+ * `worker.recognize`. Helps detect Safari-specific empty/odd shapes.
+ */
+function summarizeRecognizeData(data: unknown): void {
+  if (!data || typeof data !== 'object') {
+    log('recognize data: <none>', data);
+    return;
+  }
+  const d = data as AnyObj;
+  const textPreview = typeof d.text === 'string' ? (d.text as string).slice(0, 120) : undefined;
+  const summary = {
+    keys: Object.keys(d),
+    textLen: typeof d.text === 'string' ? (d.text as string).length : null,
+    textPreview,
+    confidence: d.confidence,
+    blocks: Array.isArray(d.blocks) ? (d.blocks as unknown[]).length : (d.blocks ? 'present' : 'absent'),
+    words: Array.isArray(d.words) ? (d.words as unknown[]).length : (d.words ? 'present' : 'absent'),
+  };
+  log('recognize data summary:', summary);
+}
 
 type AnyObj = { [k: string]: unknown };
 

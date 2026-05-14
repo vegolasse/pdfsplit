@@ -130,6 +130,7 @@ body {
   flex-wrap: wrap;
   min-height: var(--tap);
 }
+.toolbar:empty { display: none; }
 
 .btn {
   appearance: none;
@@ -186,6 +187,71 @@ body {
 }
 .file-chip button:hover { background: rgba(255,59,48,0.85); color: white; }
 
+/* ---------- macOS-style toggle switch ---------- */
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  font-size: var(--font-size-btn);
+  font-weight: 500;
+  min-height: var(--tap);
+  padding: 0 6px;
+}
+.toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 0; height: 0;
+}
+.toggle-track {
+  position: relative;
+  display: inline-block;
+  width: 78px;
+  height: 46px;
+  border-radius: 999px;
+  background: rgba(120, 120, 128, 0.32);
+  flex-shrink: 0;
+  transition: background var(--transition);
+}
+.toggle-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.18), 0 1px 1px rgba(0,0,0,0.06);
+  transition: transform var(--transition);
+}
+.toggle input:checked ~ .toggle-track {
+  background: var(--accent);
+}
+.toggle input:checked ~ .toggle-track .toggle-knob {
+  transform: translateX(32px);
+}
+.toggle input:focus-visible ~ .toggle-track {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+.toggle:hover .toggle-track {
+  filter: brightness(0.97);
+}
+.toggle--disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+.toggle-label {
+  white-space: nowrap;
+}
+@media (max-width: 480px) {
+  .toggle { font-size: 20px; gap: 10px; }
+  .toggle-label { white-space: normal; }
+}
+
 .preview {
   flex: 1;
   background: rgba(255,255,255,0.5);
@@ -237,7 +303,72 @@ body {
 .empty-state h2 { color: var(--fg); margin: 0 0 8px; font-size: 22px; font-weight: 600; }
 .empty-state p { margin: 0; font-size: var(--font-size-base); line-height: 1.5; }
 
-/* ---------- Split progress ---------- */
+/* ---------- Help tab content ---------- */
+.help {
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 8px 8px 32px;
+  line-height: 1.55;
+  font-size: 17px;
+  color: var(--fg);
+}
+.help h2 {
+  margin: 4px 0 14px;
+  font-size: 24px;
+  font-weight: 600;
+}
+.help h3 {
+  margin: 28px 0 10px;
+  font-size: 19px;
+  font-weight: 600;
+}
+.help p { margin: 0 0 12px; }
+.help .caption {
+  text-align: center;
+  color: var(--fg-muted);
+  font-size: 14px;
+  margin-top: -4px;
+}
+.help .note {
+  font-size: 14px;
+  color: var(--fg-muted);
+  font-style: italic;
+}
+.help-steps {
+  margin: 4px 0 12px;
+  padding-left: 24px;
+}
+.help-steps li { margin: 6px 0; }
+
+.help-diagram {
+  display: block;
+  width: 100%;
+  max-width: 540px;
+  height: auto;
+  margin: 14px auto 6px;
+}
+.help-diagram-sheet {
+  fill: var(--control-bg);
+  stroke: var(--control-border);
+  stroke-width: 1.2;
+}
+.help-diagram-fold {
+  stroke: var(--control-border);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+.help-diagram-label {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  fill: var(--fg);
+}
+.help-diagram-tag {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Mono", ui-monospace, monospace;
+  font-size: 12px;
+  fill: var(--fg-muted);
+}
 .split-progress {
   margin: auto;
   width: min(420px, 100%);

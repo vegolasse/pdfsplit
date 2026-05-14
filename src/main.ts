@@ -30,7 +30,6 @@ async function boot() {
       fileName: last.name,
       originalBytes: new Uint8Array(last.bytes),
       convertedBytes: null,
-      view: 'original',
     });
   }
 }
