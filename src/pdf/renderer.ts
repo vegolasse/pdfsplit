@@ -3,6 +3,10 @@ import type { PDFDocumentProxy } from 'pdfjs-dist';
 /**
  * Render one page of a pdf.js document into a canvas at a target CSS width.
  * Returns the canvas element (created if not provided).
+ *
+ * iOS Safari note: we explicitly use `willReadFrequently: true` to push the
+ * 2D context onto WebKit's CPU-backed canvas. The GPU path silently throws
+ * `TypeError: Type error` for some pdf.js operations on iOS 18.
  */
 export async function renderPageToCanvas(
   doc: PDFDocumentProxy,
@@ -17,12 +21,16 @@ export async function renderPageToCanvas(
   const viewport = page.getViewport({ scale });
 
   const c = canvas ?? document.createElement('canvas');
-  const ctx = c.getContext('2d');
+  const ctx = c.getContext('2d', { willReadFrequently: true, alpha: false });
   if (!ctx) throw new Error('2D canvas context unavailable');
   c.width = Math.floor(viewport.width);
   c.height = Math.floor(viewport.height);
   c.style.width = `${cssWidth}px`;
   c.style.height = `${(cssWidth * viewport.height) / viewport.width}px`;
+
+  // White background under the page (pdf.js doesn't fill it on alpha:false).
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, c.width, c.height);
 
   await page.render({ canvasContext: ctx, viewport, canvas: c }).promise;
   return c;

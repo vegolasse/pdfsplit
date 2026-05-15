@@ -169,32 +169,34 @@ export function buildPreview(): HTMLElement {
 /**
  * Produce a useful one-line description of a thrown value. WebKit/Safari
  * collapses many internal failures into a bare `TypeError: Type error` with
- * no `.message` detail, which is useless on its own — this helper digs out
- * the error name, code, cause, and any nested `.details` pdf.js attaches.
+ * no `.message` detail and no `.stack`, which is useless on its own — this
+ * helper dumps every own property of the error so something at least
+ * survives into the on-screen message.
  */
 function describeError(err: unknown): string {
   if (err == null) return String(err);
   if (typeof err !== 'object') return String(err);
-  const e = err as {
-    name?: string;
-    message?: string;
-    code?: unknown;
-    details?: unknown;
-    cause?: unknown;
-    stack?: string;
-  };
+  const e = err as Record<string, unknown> & { name?: string; message?: string; stack?: string };
+
   const parts: string[] = [];
-  if (e.name) parts.push(e.name);
-  if (e.message) parts.push(e.message);
-  if (e.code !== undefined) parts.push(`code=${String(e.code)}`);
-  if (e.details !== undefined) parts.push(`details=${String(e.details)}`);
-  if (e.cause !== undefined && e.cause !== null) parts.push(`cause=${describeError(e.cause)}`);
-  let out = parts.join(' · ') || 'unknown error';
-  if (out === 'TypeError · Type error' && e.stack) {
-    // Add the first stack frame so we can at least see where it came from.
-    const firstFrame = e.stack.split('\n').find((l) => l.trim().length > 0);
-    if (firstFrame) out += ` @ ${firstFrame.trim()}`;
+  if (e.name) parts.push(String(e.name));
+  if (e.message) parts.push(String(e.message));
+  // Pull in any extra own properties pdf.js attaches (code, details, status,
+  // url, response, etc.).
+  for (const key of Object.getOwnPropertyNames(e)) {
+    if (key === 'name' || key === 'message' || key === 'stack') continue;
+    const v = e[key];
+    if (v === undefined || v === null) continue;
+    if (typeof v === 'object') {
+      try { parts.push(`${key}=${JSON.stringify(v)}`); } catch { parts.push(`${key}=[object]`); }
+    } else {
+      parts.push(`${key}=${String(v)}`);
+    }
   }
-  return out;
+  if (e.stack) {
+    const firstFrame = e.stack.split('\n').find((l) => l.trim().length > 0 && !/^\w*Error/.test(l));
+    if (firstFrame) parts.push(`@ ${firstFrame.trim()}`);
+  }
+  return parts.join(' · ') || 'unknown error';
 }
 
