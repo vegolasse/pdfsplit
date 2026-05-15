@@ -30,7 +30,7 @@ const LANG_MAP: Record<string, string> = {
   fr: 'fra',
 };
 
-type RecognizeImage = HTMLCanvasElement | Blob | ImageData | string;
+type RecognizeImage = ImageData | Blob;
 type AnyWorker = {
   recognize(
     image: RecognizeImage,
@@ -82,31 +82,31 @@ export class Ocr {
   }
 
   /**
-   * Run OCR on an off-screen canvas. Returns one entry per recognized word.
-   * Empty or zero-area boxes are filtered out.
+   * Run OCR on a raw `ImageData` (preferred — pixels are passed straight
+   * through to tesseract.js with zero re-encoding), or on a pre-encoded
+   * image `Blob` if you already have one. Returns one entry per recognized
+   * word; empty / zero-area boxes are filtered out.
    *
-   * Safari note: passing an `HTMLCanvasElement` directly into tesseract.js
-   * v6/v7 goes through an `OffscreenCanvas` / `transferToImageBitmap` path
-   * that misbehaves in Safari (produces a blank/empty result silently). We
-   * convert the canvas to a PNG `Blob` first, which works reliably in all
-   * browsers.
+   * We deliberately do NOT accept a `HTMLCanvasElement` here. Older
+   * versions converted the canvas to a PNG `Blob` first to work around a
+   * Safari bug in tesseract.js's internal `OffscreenCanvas` path — but
+   * that costs an extra full-resolution buffer for the PNG. Callers should
+   * pull `ImageData` out of the canvas themselves (with `getImageData()`)
+   * and pass that, so no extra image gets allocated.
    */
-  async recognizeWords(canvas: HTMLCanvasElement): Promise<WordBox[]> {
+  async recognizeWords(image: ImageData | Blob): Promise<WordBox[]> {
     if (!this.workerP) await this.start();
     const worker = await this.workerP!;
-    log(`encoding ${canvas.width}×${canvas.height} canvas to PNG…`);
-    const tBlob = performance.now();
-    const blob: Blob = await new Promise((res, rej) =>
-      canvas.toBlob(
-        (b) => (b ? res(b) : rej(new Error('canvas.toBlob returned null'))),
-        'image/png',
-      ),
+    log(
+      'recognize input:',
+      image instanceof Blob
+        ? `Blob ${image.size}b ${image.type}`
+        : `ImageData ${image.width}×${image.height}`,
     );
-    log(`PNG blob: ${blob.size} bytes, type=${blob.type}, encoded in ${(performance.now() - tBlob).toFixed(0)}ms`);
     const tRec = performance.now();
     let res: { data: unknown };
     try {
-      res = await worker.recognize(blob, undefined, { blocks: true });
+      res = await worker.recognize(image, undefined, { blocks: true });
     } catch (e) {
       log('worker.recognize THREW', e);
       throw e;
