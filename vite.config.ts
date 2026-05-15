@@ -6,7 +6,12 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // Copy pdf.js worker into /public so it ships with the right base path.
-const workerSrc = resolve(__dirname, 'node_modules/pdfjs-dist/build/pdf.worker.min.mjs');
+// We use the *legacy* build of both the lib and the worker: it's the same
+// engine as the modern build (transpiled + polyfilled at build time) so it
+// runs on slightly older JS runtimes — most importantly iOS Safari 18, which
+// doesn't yet implement Map.prototype.getOrInsertComputed, Math.sumPrecise,
+// etc. that the modern build uses.
+const workerSrc = resolve(__dirname, 'node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs');
 const workerDest = resolve(__dirname, 'public/pdf.worker.min.mjs');
 try {
   mkdirSync(resolve(__dirname, 'public'), { recursive: true });
