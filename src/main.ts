@@ -1,3 +1,4 @@
+import './app/polyfills';
 import './styles.css';
 import { h } from './app/dom';
 import { store } from './app/state';
