@@ -244,12 +244,41 @@ async function splitViaCanvas(
         // tab eventually gets killed by the WKWebView memory watchdog.
         await new Promise<void>((r) => setTimeout(r, 0));
       }
+
+      // Release the pdf.js page's worker-side caches (parsed operator list,
+      // font cache, image dict, etc.) before moving on. Without this,
+      // pdf.js retains every rendered page in worker memory for the
+      // lifetime of the PDFDocumentProxy, which on iOS Safari blows the
+      // per-tab budget after ~12–15 pages even though our own buffers
+      // look clean from the main thread. `false` keeps timing/stats —
+      // we don't use them, but passing `true` would needlessly fail
+      // builds against pdfjs typings that don't accept an argument.
+      try {
+        await (page as unknown as { cleanup?: () => unknown }).cleanup?.();
+      } catch (e) {
+        console.warn('[split] page.cleanup failed', e);
+      }
     }
 
     // Drain whatever OCR is still in flight at the end.
     await drainInflight();
+
+    // Whole-document cleanup: release any remaining cross-page caches
+    // (object cache, fonts shared between pages, etc.) before we start
+    // building the output PDF with pdf-lib.
+    try {
+      await (doc as unknown as { cleanup?: () => unknown }).cleanup?.();
+    } catch (e) {
+      console.warn('[split] doc.cleanup failed', e);
+    }
   } finally {
     if (ocr) void ocr.stop();
+    // Tear down the pdf.js worker doc so the worker process can shrink.
+    try {
+      await (doc as unknown as { destroy?: () => unknown }).destroy?.();
+    } catch (e) {
+      console.warn('[split] doc.destroy failed', e);
+    }
   }
 
   // ----- Assemble output PDF ------------------------------------------------
