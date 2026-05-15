@@ -19,6 +19,8 @@ export function buildToolbar(): HTMLElement {
     if (s.view === 'original') {
       root.append(uploadButton(), fileChip());
     } else if (s.view === 'converted') {
+      const share = shareButton();
+      if (share) root.append(share);
       root.append(downloadButton(), ocrToggle());
     }
     // Help view: no toolbar items.
@@ -86,6 +88,110 @@ function downloadButton(): HTMLElement {
       downloadBlob(cur.convertedBytes, `${baseName}-split.pdf`);
     },
   }, t('header.download'));
+}
+
+/**
+ * Native-share button. Only rendered when `navigator.share` is available
+ * (essentially: mobile Safari / Chrome / Edge and a few desktop builds).
+ *
+ * Returns `null` when sharing isn't supported, so the caller can simply
+ * skip it. The icon is platform-aware: iOS-style "tray + up arrow" on
+ * iOS/iPadOS, Android-style "three connected dots" everywhere else
+ * (Android, ChromeOS, desktop Edge, etc.) so the button visually matches
+ * the rest of the OS the user sees on their device.
+ */
+function shareButton(): HTMLElement | null {
+  if (typeof navigator === 'undefined' || typeof navigator.share !== 'function') {
+    return null;
+  }
+  const s = store.get();
+  const disabled = !s.convertedBytes;
+  const label = t('header.share');
+  return h('button', {
+    class: 'btn btn-icon',
+    type: 'button',
+    disabled,
+    'aria-label': label,
+    title: label,
+    'data-i18n-aria': 'header.share',
+    onclick: async () => {
+      const cur = store.get();
+      if (!cur.convertedBytes) return;
+      const baseName = (cur.fileName ?? 'document').replace(/\.pdf$/i, '');
+      const fileName = `${baseName}-split.pdf`;
+      // Make a fresh ArrayBuffer copy: some browsers reject a File built on
+      // a SharedArrayBuffer-backed or transferred Uint8Array.
+      const bytes = cur.convertedBytes.slice();
+      const file = new File([bytes], fileName, { type: 'application/pdf' });
+      const data: ShareData = { files: [file], title: fileName };
+      try {
+        // Prefer file-sharing if the platform supports it for this file.
+        const canShareFiles =
+          typeof navigator.canShare === 'function' ? navigator.canShare(data) : true;
+        if (canShareFiles) {
+          await navigator.share(data);
+        } else {
+          // Fallback: share just the file name as text (very rare path).
+          await navigator.share({ title: fileName, text: fileName });
+        }
+      } catch (err) {
+        // AbortError = user dismissed the share sheet; not an error.
+        if ((err as DOMException)?.name !== 'AbortError') {
+          toast(t('toast.splitFail', { msg: (err as Error).message }), 'error', 4000);
+        }
+      }
+    },
+  }, shareIcon());
+}
+
+/**
+ * Inline SVG share icon matching the host platform. Detected via UA:
+ *   - iOS / iPadOS  → iOS share glyph (square with up-arrow)
+ *   - everything else → Material "share" glyph (three connected dots)
+ *
+ * Modern iPad Safari often reports `MacIntel` as platform; we treat any
+ * touch-enabled "Mac" as iPadOS too.
+ */
+function shareIcon(): SVGSVGElement {
+  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+  const platform = typeof navigator !== 'undefined' ? navigator.platform : '';
+  const isIPadOSMasquerade =
+    platform === 'MacIntel' &&
+    typeof navigator !== 'undefined' &&
+    (navigator.maxTouchPoints ?? 0) > 1;
+  const isIos = /iPad|iPhone|iPod/.test(ua) || isIPadOSMasquerade;
+
+  const svgNs = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNs, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('width', '28');
+  svg.setAttribute('height', '28');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('focusable', 'false');
+  svg.style.display = 'block';
+
+  if (isIos) {
+    // iOS share: rectangular tray with an arrow pointing up out the top.
+    // Stroked, rounded; matches SF Symbol "square.and.arrow.up".
+    svg.innerHTML = `
+      <g fill="none" stroke="currentColor" stroke-width="1.9"
+         stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3v12" />
+        <path d="M8 7l4-4 4 4" />
+        <path d="M6 11H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-1" />
+      </g>`;
+  } else {
+    // Material share: three filled dots connected by two lines.
+    svg.innerHTML = `
+      <g fill="currentColor">
+        <circle cx="18" cy="5"  r="2.6" />
+        <circle cx="6"  cy="12" r="2.6" />
+        <circle cx="18" cy="19" r="2.6" />
+        <path d="M8.3 11l7.6 -4.4 0.8 1.4 -7.6 4.4z" />
+        <path d="M8.3 13l7.6  4.4 0.8 -1.4 -7.6 -4.4z" />
+      </g>`;
+  }
+  return svg;
 }
 
 /**
