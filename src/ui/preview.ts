@@ -99,8 +99,9 @@ export function buildPreview(): HTMLElement {
           toast(t('toast.loaded', { n: doc.numPages }), 'info', 2500);
         }
       } catch (err) {
+        console.error('[preview] loadPdf failed', err);
         root.appendChild(h('div', { class: 'empty-state' },
-          h('p', {}, t('toast.invalid', { msg: (err as Error).message })),
+          h('p', {}, t('toast.invalid', { msg: describeError(err) })),
         ));
         return;
       }
@@ -126,8 +127,9 @@ export function buildPreview(): HTMLElement {
         slot.innerHTML = '';
         slot.appendChild(canvas);
       } catch (err) {
+        console.error(`[preview] render page ${i} failed`, err);
         slot.classList.remove('placeholder');
-        slot.textContent = `Error: ${(err as Error).message}`;
+        slot.textContent = `Error rendering page ${i}: ${describeError(err)}`;
       }
       await new Promise<void>((r) => requestAnimationFrame(() => r()));
     }
@@ -162,5 +164,37 @@ export function buildPreview(): HTMLElement {
 
   void rebuild();
   return root;
+}
+
+/**
+ * Produce a useful one-line description of a thrown value. WebKit/Safari
+ * collapses many internal failures into a bare `TypeError: Type error` with
+ * no `.message` detail, which is useless on its own — this helper digs out
+ * the error name, code, cause, and any nested `.details` pdf.js attaches.
+ */
+function describeError(err: unknown): string {
+  if (err == null) return String(err);
+  if (typeof err !== 'object') return String(err);
+  const e = err as {
+    name?: string;
+    message?: string;
+    code?: unknown;
+    details?: unknown;
+    cause?: unknown;
+    stack?: string;
+  };
+  const parts: string[] = [];
+  if (e.name) parts.push(e.name);
+  if (e.message) parts.push(e.message);
+  if (e.code !== undefined) parts.push(`code=${String(e.code)}`);
+  if (e.details !== undefined) parts.push(`details=${String(e.details)}`);
+  if (e.cause !== undefined && e.cause !== null) parts.push(`cause=${describeError(e.cause)}`);
+  let out = parts.join(' · ') || 'unknown error';
+  if (out === 'TypeError · Type error' && e.stack) {
+    // Add the first stack frame so we can at least see where it came from.
+    const firstFrame = e.stack.split('\n').find((l) => l.trim().length > 0);
+    if (firstFrame) out += ` @ ${firstFrame.trim()}`;
+  }
+  return out;
 }
 
