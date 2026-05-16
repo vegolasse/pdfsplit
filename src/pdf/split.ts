@@ -186,21 +186,20 @@ async function splitViaCanvas(
           ...(transform ? { transform } : {}),
         } as Parameters<typeof page.render>[0]).promise;
 
-        // 2. Pull the raw pixels out (for OCR) and encode a small JPEG
-        //    (for PDF embedding) from the same canvas. The order matters:
+        // 2. Pull the raw pixels out (only when OCR is on) and encode a
+        //    small JPEG (for PDF embedding) from the same canvas.
         //
-        //      a) getImageData copies pixels into a separate Uint8ClampedArray
-        //         so OCR has a stable buffer that survives the canvas being
-        //         freed; tesseract.js receives those pixels directly — no
-        //         JPEG/PNG round-trip and no in-worker image decode (much
-        //         less wasted RAM and CPU than passing the compressed JPEG).
+        //      a) If OCR is enabled: getImageData copies pixels into a
+        //         separate Uint8ClampedArray so OCR has a stable buffer
+        //         that survives the canvas being freed; tesseract.js
+        //         receives those pixels directly — no JPEG/PNG round-trip
+        //         and no in-worker image decode (much less wasted RAM and
+        //         CPU than passing the compressed JPEG).
+        //         If OCR is OFF, we skip this step entirely — no extra
+        //         RGBA buffer is allocated.
         //      b) toBlob produces the JPEG that goes into the final PDF.
         //      c) The canvas backing store is released immediately.
-        //
-        //    Peak main-thread memory at this point is one raw RGBA buffer
-        //    (~35 MB for an A5 half at 300 dpi) plus a ~300 KB JPEG —
-        //    nothing else.
-        const imageData = ctx.getImageData(0, 0, widthPx, heightPx);
+        const imageData = ocr ? ctx.getImageData(0, 0, widthPx, heightPx) : null;
         const jpegBlob = await canvasToBlob(fullCanvas, 'image/jpeg', JPEG_QUALITY);
         fullCanvas.width = 0;
         fullCanvas.height = 0;
@@ -218,7 +217,7 @@ async function splitViaCanvas(
 
         // 4. Queue the OCR for this half (kick it off, don't await — it will
         //    run on the Tesseract worker thread while we keep going).
-        if (ocr) {
+        if (ocr && imageData) {
           await ocrStart;
           const ocrP = ocr.recognizeWords(imageData).then(
             (raw) => raw,
